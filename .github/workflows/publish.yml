@@ -1,0 +1,78 @@
+name: Publish CVAT VF UI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  CVAT_REF: 271806df2ec87462dbb9fcdb76323a83182c8ba0
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the overlay
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Check out the pinned CVAT source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: cvat-ai/cvat
+          ref: ${{ env.CVAT_REF }}
+          path: upstream
+          persist-credentials: false
+
+      - name: Apply the overlay and prepare the image
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9][a-zA-Z0-9._-]{0,126}$ ]]; then
+            echo "::error::Use a Docker-compatible version tag such as v2.83.1-vf.1"
+            exit 1
+          fi
+
+          git -C upstream apply --check "$GITHUB_WORKSPACE/vf-ego-vehicle.patch"
+          git -C upstream apply "$GITHUB_WORKSPACE/vf-ego-vehicle.patch"
+
+          # Webpack emits browser assets that can be reused across Nginx architectures.
+          test "$(head -n 1 upstream/Dockerfile.ui)" = 'FROM node:lts-slim AS cvat-ui'
+          {
+            sed "1s/^FROM /FROM --platform=\$BUILDPLATFORM /" upstream/Dockerfile.ui
+            printf '\nCOPY LICENSE /usr/share/licenses/cvat/LICENSE\n'
+          } > upstream/Dockerfile.vf-ui
+
+          image_name=$(printf '%s' "$GITHUB_REPOSITORY" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+          printf 'IMAGE=ghcr.io/%s:%s\n' "$image_name" "$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push AMD64 and ARM64
+        run: |
+          docker buildx create --driver docker-container --use
+          docker buildx build \
+            --file upstream/Dockerfile.vf-ui \
+            --platform linux/amd64,linux/arm64 \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$IMAGE" \
+            --push \
+            upstream
+
+      - name: Verify the published platforms
+        run: |
+          docker buildx imagetools inspect --raw "$IMAGE" | jq -e '
+            [.manifests[].platform | select(.os == "linux") | .architecture]
+            | unique == ["amd64", "arm64"]
+          ' > /dev/null
+          printf 'Published %s for linux/amd64 and linux/arm64.\n' "$IMAGE" >> "$GITHUB_STEP_SUMMARY"

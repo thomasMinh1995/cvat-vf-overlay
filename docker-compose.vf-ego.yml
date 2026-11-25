@@ -1,0 +1,3 @@
+services:
+  cvat_ui:
+    image: "${CVAT_VF_IMAGE:?Set CVAT_VF_IMAGE to the GHCR image reference for your release}"

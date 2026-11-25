@@ -1,0 +1,10 @@
+# Giảm tiến trình worker trên máy yếu và đặt Grafana trong profile analytics.
+services:
+  cvat_worker_import:
+    environment:
+      NUMPROCS: 1
+  cvat_worker_export:
+    environment:
+      NUMPROCS: 1
+  cvat_grafana:
+    profiles: ["analytics"]

@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.env.*
+/upstream/
+/dist/
+/data/
+/demo/
+/media/
+/backups/
+*.pcd
+*.las
+*.laz
+*.zip
+*.tar
+*.tar.gz
