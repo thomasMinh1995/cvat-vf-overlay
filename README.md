@@ -31,6 +31,29 @@ docker compose -f docker-compose.yml -f ../cvat-vf-overlay/docker-compose.vf-ego
 
 Nếu đang dùng file Compose bổ sung hoặc có `-p` riêng, giữ các tham số đó và thêm `-f docker-compose.vf-ego.yml` của overlay cuối danh sách file. File [cho máy cấu hình thấp](docker-compose.lowspec.yml) là tùy chọn khi dựng stack, dùng một tiến trình cho mỗi worker import/export và đưa Grafana vào profile `analytics`.
 
+### Lớp VF chạy ở đâu
+
+`cvat` là tên mặc định của dự án Docker Compose. Trong nhóm đó, `cvat_ui` phục vụ giao diện web, còn `cvat_server` xử lý API và lưu nhãn. Lớp VF được tích hợp vào image của `cvat_ui` để mã giao diện trong trình duyệt đọc trực tiếp cuboid đang chọn và cập nhật yaw, tọa độ tâm ngay khi kéo. Một dịch vụ riêng vẫn cần phần tích hợp trong giao diện để nhận các thay đổi trên canvas.
+
+Repo này cung cấp bản vá và file Compose bổ sung. File đó trỏ dịch vụ `cvat_ui` đến image đã tích hợp lớp VF. Các dịch vụ CVAT khác tiếp tục dùng cấu hình hiện có.
+
+### Kiểm tra bản cài đã chạy
+
+1. Mở **Docker Desktop → Containers** và mở rộng nhóm dự án CVAT (mặc định là `cvat`). Tìm `cvat_ui` và kiểm tra container đang chạy. Mục **Images → Local** dùng để kiểm tra image đã được tải về.
+2. Xác nhận chính container `cvat_ui` đang dùng đúng tag. Chạy lệnh sau trong PowerShell hoặc Terminal.
+
+   ```sh
+   docker inspect --type container --format "{{.Config.Image}} {{.State.Status}}" cvat_ui
+   ```
+
+   Kết quả mong đợi với bản trong hướng dẫn này.
+
+   ```text
+   ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.3 running
+   ```
+
+3. Tải lại trang CVAT và mở một job 3D dùng hệ LiDAR VF. Trong khung **Perspective**, tìm bảng **Hệ trục LiDAR VF**. Bấm **Bật VF** để thấy trục và tùy chọn **Hiện 7 camera**. Chọn cuboid để kiểm tra **Yaw VF** và bảng tọa độ tâm như trong ảnh minh họa bên dưới.
+
 ## Sử dụng trong CVAT 3D
 
 ### Bật lớp chỉ dẫn VF
