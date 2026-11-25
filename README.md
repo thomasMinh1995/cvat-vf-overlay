@@ -35,7 +35,9 @@ Nếu đang dùng file Compose bổ sung hoặc có `-p` riêng, giữ các tham
 
 ### Bật lớp chỉ dẫn VF
 
-Mở một job 3D có dữ liệu theo hệ LiDAR VF. Trong khung **Perspective**, tìm bảng **Hệ trục LiDAR VF** và bấm **Bật VF**. Khi lớp chỉ dẫn hiện lên, nút chuyển thành **Tắt VF** như trong ảnh bên dưới. Mục **Bố trí 7 camera minh họa** cho biết hướng nhìn của các camera trên xe thu dữ liệu.
+Mở một job 3D có dữ liệu theo hệ LiDAR VF. Trong khung **Perspective**, tìm bảng **Hệ trục LiDAR VF** và bấm **Bật VF**. Khi lớp chỉ dẫn hiện lên, nút chuyển thành **Tắt VF** như trong ảnh bên dưới.
+
+Trong card, bỏ chọn **Hiện 7 camera** để ẩn các ký hiệu camera và dễ quan sát trục, cuboid. Chọn lại để xem camera trong khung 3D và mở **Bố trí 7 camera minh họa**. Trình duyệt ghi nhớ lựa chọn theo từng task.
 
 ### Chọn cuboid và đọc hướng xe
 

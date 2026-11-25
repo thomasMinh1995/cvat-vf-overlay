@@ -1,84 +1,100 @@
 diff --git a/cvat-canvas3d/src/typescript/canvas3d.ts b/cvat-canvas3d/src/typescript/canvas3d.ts
-index 28a9b0a..e2373f6 100644
+index 28a9b0a..4c49a01 100644
 --- a/cvat-canvas3d/src/typescript/canvas3d.ts
 +++ b/cvat-canvas3d/src/typescript/canvas3d.ts
-@@ -17,12 +17,13 @@ import {
+@@ -17,12 +17,14 @@ import {
      MergeData,
  } from './canvas3dModel';
  import {
 -    Canvas3dView, Canvas3dViewImpl, ViewsDOM, CameraAction,
-+    Canvas3dView, Canvas3dViewImpl, VfCuboidCenter, ViewsDOM, CameraAction,
++    Canvas3dView, Canvas3dViewImpl, VfCuboidCenter, VfCuboidReadout, ViewsDOM, CameraAction,
  } from './canvas3dView';
  import { Master } from './master';
  
  interface Canvas3d {
      html(): ViewsDOM;
 +    getVfCuboidCenter(): VfCuboidCenter | null;
++    getVfCuboidReadout(): VfCuboidReadout | null;
      setup(frameData: any, objectStates: any[]): void;
      isAbleToChangeFrame(): boolean;
      mode(): Mode;
-@@ -57,6 +58,10 @@ class Canvas3dImpl implements Canvas3d {
+@@ -57,6 +59,14 @@ class Canvas3dImpl implements Canvas3d {
          return this.view.html();
      }
  
 +    public getVfCuboidCenter(): VfCuboidCenter | null {
-+        return this.view.getVfCuboidCenter();
++        return this.view.getVfCuboidReadout()?.center ?? null;
++    }
++
++    public getVfCuboidReadout(): VfCuboidReadout | null {
++        return this.view.getVfCuboidReadout();
 +    }
 +
      public keyControls(keys: KeyboardEvent): void {
          this.view.keyControls(keys);
      }
 diff --git a/cvat-canvas3d/src/typescript/canvas3dModel.ts b/cvat-canvas3d/src/typescript/canvas3dModel.ts
-index bd56e79..eb97ad7 100644
+index bd56e79..12cc783 100644
 --- a/cvat-canvas3d/src/typescript/canvas3dModel.ts
 +++ b/cvat-canvas3d/src/typescript/canvas3dModel.ts
-@@ -81,6 +81,7 @@ export interface Configuration {
+@@ -81,6 +81,8 @@ export interface Configuration {
      controlPointsSize: number;
      focusedObjectPadding: number;
      orientationVisibility: OrientationVisibility;
 +    showVfEgoVehicle: boolean;
++    showVfCameras: boolean;
  }
  
  export enum UpdateReasons {
-@@ -200,6 +201,7 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
+@@ -200,6 +202,8 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
                  selectedShapeOpacity: 60,
                  focusedObjectPadding: 50,
                  controlPointsSize: consts.BASE_POINT_SIZE,
 +                showVfEgoVehicle: false,
++                showVfCameras: true,
                  orientationVisibility: {
                      x: false,
                      y: false,
-@@ -402,6 +404,9 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
+@@ -402,6 +406,11 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
      }
  
      public configure(configuration: Partial<Configuration>): void {
 +        this.data.configuration.showVfEgoVehicle = configuration.showVfEgoVehicle ??
 +            this.data.configuration.showVfEgoVehicle;
++        this.data.configuration.showVfCameras = configuration.showVfCameras ??
++            this.data.configuration.showVfCameras;
 +
          if (typeof configuration.shapeOpacity === 'number') {
              this.data.configuration.shapeOpacity = Math.max(0, Math.min(configuration.shapeOpacity, 100));
          }
 diff --git a/cvat-canvas3d/src/typescript/canvas3dView.ts b/cvat-canvas3d/src/typescript/canvas3dView.ts
-index b17c197..b5f609e 100644
+index b17c197..9054bb2 100644
 --- a/cvat-canvas3d/src/typescript/canvas3dView.ts
 +++ b/cvat-canvas3d/src/typescript/canvas3dView.ts
-@@ -18,10 +18,14 @@ import {
+@@ -18,10 +18,21 @@ import {
      createCuboidEdges, removeCuboidEdges, CuboidModel, makeCornerPointsMatrix,
  } from './cuboid';
  import { ObjectState, ObjectType } from '.';
 -import { disposeScene } from './utils';
 +import { disposeObject3D, disposeScene } from './utils';
-+import { createVfCuboidAxisLabels, createVfEgoVehicle, VF_EGO_VEHICLE } from './vfEgoVehicle';
++import {
++    createVfCuboidAxisLabels, createVfEgoVehicle, VF_EGO_CAMERAS, VF_EGO_VEHICLE,
++} from './vfEgoVehicle';
 +
 +export type VfCuboidCenter = readonly [number, number, number];
++
++export interface VfCuboidReadout {
++    readonly center: VfCuboidCenter;
++    readonly dragView: ViewType | null;
++}
  
  export interface Canvas3dView {
      html(): ViewsDOM;
-+    getVfCuboidCenter(): VfCuboidCenter | null;
++    getVfCuboidReadout(): VfCuboidReadout | null;
      render(): void;
      keyControls(keys: KeyboardEvent): void;
      focusObjectByClientId(clientID: number, animate?: boolean): void;
-@@ -64,6 +68,7 @@ interface DrawnObjectData {
+@@ -64,6 +75,7 @@ interface DrawnObjectData {
      clientID: number;
      labelID: number;
      labelColor: string;
@@ -86,7 +102,7 @@ index b17c197..b5f609e 100644
      points: number[];
      groupID: number | null;
      groupColor: string;
-@@ -90,6 +95,7 @@ const BOTTOM_VIEWS = [
+@@ -90,6 +102,7 @@ const BOTTOM_VIEWS = [
  ];
  
  const ALL_VIEWS = [...BOTTOM_VIEWS, ViewType.PERSPECTIVE];
@@ -94,7 +110,7 @@ index b17c197..b5f609e 100644
  
  function drawnDataFromState(state: ObjectState): DrawnObjectData {
      return {
-@@ -97,6 +103,7 @@ function drawnDataFromState(state: ObjectState): DrawnObjectData {
+@@ -97,6 +110,7 @@ function drawnDataFromState(state: ObjectState): DrawnObjectData {
          clientID: state.clientID,
          labelID: state.label.id,
          labelColor: state.label.color,
@@ -102,16 +118,25 @@ index b17c197..b5f609e 100644
          groupID: state.group?.id || null,
          groupColor: state.group?.color || '#ffffff',
          points: [...state.points],
-@@ -130,6 +137,8 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -130,6 +144,8 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
          cuboid: CuboidModel;
      }>;
      private hoverNeedsUpdate: boolean;
 +    private vfCuboidLabels: ReturnType<typeof createVfCuboidAxisLabels> | null = null;
-+    private vfCuboidCenter: VfCuboidCenter | null = null;
++    private vfCuboidReadout: VfCuboidReadout | null = null;
  
      public focusObjectByClientId(clientID: number, animate: boolean = true): void {
          const cuboidModel = this.drawnObjects[clientID];
-@@ -1202,10 +1211,11 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -145,7 +161,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+             previousPosition: null | THREE.Vector3;
+             helperElement: THREE.Object3D;
+         };
+-        scan: any;
++        scan: ViewType | null;
+         rotation: any;
+         detected: any;
+         initialMouseVector: any;
+@@ -1202,10 +1218,11 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
      }
  
      private deactivateObject(): void {
@@ -124,7 +149,7 @@ index b17c197..b5f609e 100644
              for (const view of BOTTOM_VIEWS) {
                  cuboid[view].visible = false;
                  removeCuboidEdges(cuboid[view]);
-@@ -1217,11 +1227,12 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1217,11 +1234,12 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
      }
  
      private activateObject(): void {
@@ -138,7 +163,7 @@ index b17c197..b5f609e 100644
              for (const view of BOTTOM_VIEWS) {
                  cuboid[view].visible = true;
                  createCuboidEdges(cuboid[view]);
-@@ -1503,6 +1514,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1503,6 +1521,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
              }
          } else if (reason === UpdateReasons.CONFIG_UPDATED) {
              const config = { ...model.data.configuration };
@@ -146,7 +171,7 @@ index b17c197..b5f609e 100644
              for (const key of Object.keys(this.drawnObjects)) {
                  const clientID = +key;
                  const { cuboid, data } = this.drawnObjects[clientID];
-@@ -1516,7 +1528,9 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1516,7 +1535,9 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
                      cuboid.setOutlineColor(config.outlinedBorders || consts.DEFAULT_OUTLINE_COLOR);
                  }
  
@@ -157,7 +182,7 @@ index b17c197..b5f609e 100644
              }
  
              BOTTOM_VIEWS.forEach((view) => {
-@@ -1648,6 +1662,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1648,6 +1669,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
      }
  
      private clearScene(): void {
@@ -165,23 +190,26 @@ index b17c197..b5f609e 100644
          Object.entries(this.drawnObjects).forEach(([clientID, { cuboid }]) => {
              this.removeSceneChildren(cuboid, +clientID);
          });
-@@ -1756,6 +1771,51 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1756,6 +1778,59 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
          return helperWorldSize;
      }
  
 +    private updateVfEgoVehicle(): void {
 +        const { scene } = this.views.perspective;
-+        const marker = scene.getObjectByName(VF_EGO_VEHICLE);
-+        if (this.model.data.configuration.showVfEgoVehicle) {
++        const { showVfEgoVehicle, showVfCameras } = this.model.data.configuration;
++        let marker = scene.getObjectByName(VF_EGO_VEHICLE);
++        if (showVfEgoVehicle) {
 +            if (!marker) {
 +                const axes = scene.children.find((child) => child instanceof THREE.AxesHelper);
 +                if (axes) {
-+                    const ego = createVfEgoVehicle(axes.position, AXES_LENGTH);
++                    marker = createVfEgoVehicle(axes.position, AXES_LENGTH);
 +                    this.vfCuboidLabels = createVfCuboidAxisLabels();
-+                    ego.add(this.vfCuboidLabels.group);
-+                    scene.add(ego);
++                    marker.add(this.vfCuboidLabels.group);
++                    scene.add(marker);
 +                }
 +            }
++            const cameras = marker?.getObjectByName(VF_EGO_CAMERAS);
++            if (cameras) cameras.visible = showVfCameras;
 +        } else if (marker) {
 +            this.vfCuboidLabels = null;
 +            scene.remove(marker);
@@ -189,11 +217,16 @@ index b17c197..b5f609e 100644
 +        }
 +    }
 +
-+    private updateVfCuboidCenter(position: THREE.Vector3 | null): void {
-+        const previous = this.vfCuboidCenter;
-+        if (position?.x === previous?.[0] && position?.y === previous?.[1] && position?.z === previous?.[2]) return;
++    private updateVfCuboidReadout(position: THREE.Vector3 | null): void {
++        const previous = this.vfCuboidReadout;
++        const dragView = position && this.action.translation.status ? this.action.scan : null;
++        if (!position && !previous) return;
++        if (
++            position && previous && dragView === previous.dragView &&
++            position.x === previous.center[0] && position.y === previous.center[1] && position.z === previous.center[2]
++        ) return;
 +
-+        this.vfCuboidCenter = position ? [position.x, position.y, position.z] : null;
++        this.vfCuboidReadout = position ? { center: [position.x, position.y, position.z], dragView } : null;
 +        this.dispatchEvent(new CustomEvent('canvas.vfcenter'));
 +    }
 +
@@ -202,7 +235,7 @@ index b17c197..b5f609e 100644
 +        const activeID = this.activatedElementID;
 +        const object = labels && activeID !== null ? this.drawnObjects[activeID] : undefined;
 +        const visibleCuboid = object?.cuboid.perspective.visible ? object.cuboid : null;
-+        this.updateVfCuboidCenter(visibleCuboid?.perspective.position ?? null);
++        this.updateVfCuboidReadout(visibleCuboid?.perspective.position ?? null);
 +        if (!labels) return;
 +
 +        labels.group.visible = !!visibleCuboid;
@@ -217,7 +250,7 @@ index b17c197..b5f609e 100644
      private onSceneImageLoaded(points: any): void {
          const getCameraSettingsToFitScene = (
              camera: THREE.PerspectiveCamera,
-@@ -1818,7 +1878,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1818,7 +1893,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
  
          const origin = new THREE.Vector3(0, 0, 0);
          const isOriginInScene = this.sceneBBox.containsPoint(origin);
@@ -226,7 +259,7 @@ index b17c197..b5f609e 100644
          if (isOriginInScene) {
              this.cameraSettings.perspective.lookAt = [0, 0, 0];
              axesHelper.position.set(0, 0, 0);
-@@ -1828,6 +1888,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1828,6 +1903,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
          }
  
          this.views.perspective.scene.add(axesHelper);
@@ -234,7 +267,7 @@ index b17c197..b5f609e 100644
          // Setup TopView
          const canvasTopView = this.views.top.renderer.domElement;
          const topScenePlane = new THREE.Mesh(
-@@ -2016,6 +2077,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -2016,6 +2092,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
      };
  
      public render(): void {
@@ -242,12 +275,12 @@ index b17c197..b5f609e 100644
          Object.keys(this.views).forEach((view: string): void => {
              const viewType = this.views[view as keyof Views];
              if (!(viewType.controls && viewType.camera && viewType.rayCaster)) return;
-@@ -2552,6 +2614,10 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -2552,6 +2629,10 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
          }
      }
  
-+    public getVfCuboidCenter(): VfCuboidCenter | null {
-+        return this.vfCuboidCenter;
++    public getVfCuboidReadout(): VfCuboidReadout | null {
++        return this.vfCuboidReadout;
 +    }
 +
      public html(): ViewsDOM {
@@ -273,14 +306,15 @@ index 5df51fc..58f748b 100644
      }
 diff --git a/cvat-canvas3d/src/typescript/vfEgoVehicle.ts b/cvat-canvas3d/src/typescript/vfEgoVehicle.ts
 new file mode 100644
-index 0000000..1a28e4b
+index 0000000..248c152
 --- /dev/null
 +++ b/cvat-canvas3d/src/typescript/vfEgoVehicle.ts
-@@ -0,0 +1,224 @@
+@@ -0,0 +1,227 @@
 +// Displays an illustrative rig in VF LiDAR coordinates: +X left, +Y rear, +Z up.
 +import * as THREE from 'three';
 +
 +export const VF_EGO_VEHICLE = 'vf-ego-vehicle';
++export const VF_EGO_CAMERAS = 'vf-ego-cameras';
 +
 +const BODY_HEIGHT = -0.7;
 +const FRONT_COLOR = 0xffd166;
@@ -388,7 +422,9 @@ index 0000000..1a28e4b
 +    return label;
 +}
 +
-+function addCameras(rig: THREE.Group): void {
++function createCameras(): THREE.Group {
++    const rig = new THREE.Group();
++    rig.name = VF_EGO_CAMERAS;
 +    const opticalAxis = new THREE.Vector3(0, 0, 1);
 +    for (const { name, origin, angle } of CAMERA_LAYOUT) {
 +        const position = new THREE.Vector3(...origin);
@@ -412,6 +448,7 @@ index 0000000..1a28e4b
 +        if (name === 'cam03') label.center.set(1, 0);
 +        rig.add(housing, ray, label);
 +    }
++    return rig;
 +}
 +
 +export function createVfCuboidAxisLabels(): {
@@ -496,8 +533,7 @@ index 0000000..1a28e4b
 +    const up = createLabel('LiDAR VF +Z · LÊN', AXIS_COLORS[2], AXIS_LABEL_HEIGHT);
 +    up.position.set(0, 0, axisLength).add(axisOrigin);
 +
-+    group.add(front, left, rear, up);
-+    addCameras(group);
++    group.add(front, left, rear, up, createCameras());
 +
 +    return group;
 +}
@@ -551,74 +587,133 @@ index ad14fd4..b6cddd1 100644
      },
 diff --git a/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/vf-ego-panel.scss b/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/vf-ego-panel.scss
 new file mode 100644
-index 0000000..b1f5684
+index 0000000..61137a6
 --- /dev/null
 +++ b/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/vf-ego-panel.scss
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,136 @@
 +.cvat-vf-ego-panel {
++    box-sizing: border-box;
 +    position: absolute;
 +    z-index: 1;
 +    top: 44px;
 +    left: 13px;
-+    width: 232px;
++    width: 252px;
 +    max-width: calc(100% - 26px);
 +    max-height: calc(100% - 94px);
 +    overflow: auto;
-+    padding: 8px 10px;
-+    border: 1px solid #465867;
-+    border-radius: 8px;
-+    background: rgb(18 26 34 / 95%);
-+    color: #edf4fa;
-+    font: 12px/1.5 system-ui, sans-serif;
++    padding: 12px 14px;
++    border: 1px solid #334458;
++    border-radius: 12px;
++    background: #162333;
++    color: #edf5ff;
++    font: 13px/1.45 system-ui, sans-serif;
 +
 +    .cvat-vf-ego-header {
 +        display: flex;
 +        align-items: center;
 +        justify-content: space-between;
++        flex-wrap: wrap;
 +        gap: 6px;
-+        margin-bottom: 3px;
-+        font-size: 13px;
++        font-size: 15px;
++    }
++
++    .cvat-vf-ego-header + .cvat-vf-muted {
++        margin-top: 12px;
 +    }
 +
 +    button {
-+        padding: 1px 8px;
-+        border: 1px solid #638193;
-+        border-radius: 4px;
-+        background: #283c4b;
-+        color: inherit;
-+        font: inherit;
++        flex-shrink: 0;
++        padding: 2px 8px;
++        border: 1px solid #89b3d8;
++        border-radius: 6px;
++        background: #223751;
++        color: #b1dbff;
++        font: 600 12px/1.45 system-ui, sans-serif;
 +        cursor: pointer;
 +    }
 +
-+    .cvat-vf-ego-front {
-+        color: #ffd166;
-+        font-weight: 700;
++    .cvat-vf-muted {
++        color: #aebfd4;
++    }
 +
-+        span {
-+            color: #edf4fa;
-+            font-weight: 400;
-+        }
++    .cvat-vf-ego-front {
++        margin-top: 5px;
++        color: #ffcf72;
++        font-weight: 700;
 +    }
 +
 +    .cvat-vf-cuboid-center {
-+        margin-top: 6px;
-+        padding: 4px 7px;
-+        border-radius: 4px;
-+        background: #263540;
++        margin-top: 14px;
++        padding-top: 12px;
++        border-top: 1px solid #334458;
++
++        > .cvat-vf-muted {
++            margin-bottom: 3px;
++        }
 +    }
 +
 +    .cvat-vf-cuboid-center-values {
-+        display: flex;
-+        flex-wrap: wrap;
-+        justify-content: space-between;
-+        gap: 2px 8px;
++        display: grid;
++        gap: 6px;
++        margin-top: 8px;
 +        font-variant-numeric: tabular-nums;
++
++        > div {
++            display: flex;
++            justify-content: space-between;
++            align-items: baseline;
++            gap: 6px;
++            padding: 4px 9px;
++            border: 1px solid #2d4258;
++            border-radius: 7px;
++            background: #203146;
++        }
++
++        span {
++            overflow-wrap: anywhere;
++            text-align: right;
++            font-size: 19px;
++            font-weight: 700;
++        }
++
++        [data-axis='X'] b {
++            color: #ff806d;
++        }
++
++        [data-axis='Y'] b {
++            color: #96dc8e;
++        }
++
++        [data-axis='Z'] b {
++            color: #7bc5ff;
++        }
++    }
++
++    .cvat-vf-cuboid-status {
++        margin-top: 12px;
++
++        &[data-dragging='true'] strong {
++            color: #ffcf72;
++        }
++    }
++
++    .cvat-vf-camera-toggle {
++        display: flex;
++        align-items: center;
++        gap: 7px;
++        margin-top: 12px;
++        cursor: pointer;
++
++        input {
++            margin: 0;
++            accent-color: #7bc5ff;
++        }
 +    }
 +
 +    details {
-+        margin-top: 6px;
-+        padding-top: 4px;
-+        border-top: 1px solid #465867;
++        margin-top: 10px;
++        padding-top: 6px;
++        border-top: 1px solid #334458;
 +
 +        summary {
 +            cursor: pointer;
@@ -634,14 +729,14 @@ index 0000000..b1f5684
 +}
 diff --git a/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/vf-ego-panel.tsx b/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/vf-ego-panel.tsx
 new file mode 100644
-index 0000000..02c45d2
+index 0000000..cb976f6
 --- /dev/null
 +++ b/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/vf-ego-panel.tsx
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,139 @@
 +import React, {
 +    useCallback, useEffect, useState, useSyncExternalStore,
 +} from 'react';
-+import { Canvas3d } from 'cvat-canvas3d-wrapper';
++import { Canvas3d, ViewType } from 'cvat-canvas3d-wrapper';
 +
 +const cameras = [
 +    { name: 'cam01', angle: 0, label: 'cam01 0° · cam03 +5°', x: 110, y: 15 },
@@ -659,21 +754,35 @@ index 0000000..02c45d2
 +        target.addEventListener('canvas.vfcenter', notify);
 +        return () => target.removeEventListener('canvas.vfcenter', notify);
 +    }, [canvas]);
-+    const getSnapshot = useCallback(() => canvas.getVfCuboidCenter(), [canvas]);
-+    const center = useSyncExternalStore(subscribe, getSnapshot);
-+    if (!center) return null;
++    const getSnapshot = useCallback(() => canvas.getVfCuboidReadout(), [canvas]);
++    const readout = useSyncExternalStore(subscribe, getSnapshot);
++    if (!readout) return null;
++
++    const { center, dragView } = readout;
++    const viewName = {
++        [ViewType.TOP]: 'Top',
++        [ViewType.SIDE]: 'Side',
++        [ViewType.FRONT]: 'Front',
++        [ViewType.PERSPECTIVE]: 'Perspective',
++    };
 +
 +    return (
 +        <div className='cvat-vf-cuboid-center'>
++            <div className='cvat-vf-muted'>Xe được gán nhãn</div>
 +            <strong>Tâm cuboid · LiDAR VF (m)</strong>
 +            <div className='cvat-vf-cuboid-center-values'>
 +                {(['X', 'Y', 'Z'] as const).map((axis, index) => (
-+                    <span key={axis}>
++                    <div key={axis} data-axis={axis}>
 +                        <b>{axis}</b>
-+                        {' '}
-+                        {(Math.round(center[index] * 100) / 100).toFixed(2)}
-+                    </span>
++                        <span>{(Math.round(center[index] * 100) / 100).toFixed(2).replace('-', '−')}</span>
++                    </div>
 +                ))}
++            </div>
++            <div className='cvat-vf-cuboid-status' data-dragging={!!dragView}>
++                <strong role='status'>{dragView ? `Đang kéo trong ${viewName[dragView]}` : 'Đã chọn cuboid'}</strong>
++                <div className='cvat-vf-muted'>
++                    {dragView ? 'Cập nhật khi giữ chuột' : 'Tọa độ tính từ gốc LiDAR'}
++                </div>
 +            </div>
 +        </div>
 +    );
@@ -681,7 +790,13 @@ index 0000000..02c45d2
 +
 +export default function VfEgoPanel({ canvas, taskId }: { canvas: Canvas3d; taskId: number }): JSX.Element {
 +    const settingKey = `cvat:show-vf-ego:task:${taskId}`;
++    const cameraSettingKey = `cvat:show-vf-cameras:task:${taskId}`;
 +    const [visible, setVisible] = useState(() => localStorage.getItem(settingKey) === 'true');
++    const [camerasVisible, setCamerasVisible] = useState(() => localStorage.getItem(cameraSettingKey) !== 'false');
++
++    useEffect(() => {
++        canvas.configure({ showVfCameras: camerasVisible });
++    }, [canvas, camerasVisible]);
 +
 +    useEffect(() => {
 +        if (!visible) return undefined;
@@ -711,13 +826,23 @@ index 0000000..02c45d2
 +            </div>
 +            {visible && (
 +                <>
-+                    <div>○ Xe gắn LiDAR · trục cố định</div>
-+                    <div className='cvat-vf-ego-front'>↑ −Y đầu xe <span>· +Y đuôi xe</span></div>
++                    <div className='cvat-vf-muted'>Xe gắn LiDAR · trục cố định</div>
++                    <div className='cvat-vf-ego-front'>−Y đầu xe · +Y đuôi xe</div>
 +                    <div>+X trái · −X phải · +Z lên</div>
-+                    <div><strong>Xe được gán nhãn</strong> · trục cuboid</div>
-+                    <div><strong>+X đỏ</strong> đầu xe · <strong>−X</strong> đuôi xe</div>
 +                    <VfCuboidCenterReadout canvas={canvas} />
-+                    <details>
++                    <label className='cvat-vf-camera-toggle'>
++                        <input
++                            type='checkbox'
++                            checked={camerasVisible}
++                            onChange={(event) => {
++                                const { checked } = event.currentTarget;
++                                setCamerasVisible(checked);
++                                localStorage.setItem(cameraSettingKey, String(checked));
++                            }}
++                        />
++                        Hiện 7 camera
++                    </label>
++                    <details hidden={!camerasVisible}>
 +                        <summary>Bố trí 7 camera minh họa</summary>
 +                        <svg viewBox='0 0 220 165' role='img' aria-label='Bố trí camera minh họa, đầu xe hướng lên'>
 +                            {cameras.map(({ name, angle, label, x, y }) => {
