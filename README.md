@@ -33,20 +33,34 @@ Nếu đang dùng file Compose bổ sung hoặc có `-p` riêng, giữ các tham
 
 ## Sử dụng trong CVAT 3D
 
-1. Mở một job 3D có dữ liệu theo hệ LiDAR VF. Trong khung **Perspective**, chọn **Bật VF** ở bảng **Hệ trục LiDAR VF**. Mở **Bố trí 7 camera minh họa** nếu cần xem hướng các camera.
-2. Chọn một cuboid. Với lớp **Car**, **Truck** hoặc **Bus**, mũi tên đỏ có nhãn **Cuboid +X · ĐẦU XE**. Nhãn **Cuboid −X · ĐUÔI XE** nằm ở phía đối diện. Đọc **Yaw VF** ngay cạnh mũi tên đỏ khi xoay hộp.
-3. Giữ chuột trái và kéo bên trong cuboid ở khung **Top** để dịch ngang hoặc kéo lên xuống ở khung **Side** để chỉnh độ cao. Bảng **Tâm cuboid · LiDAR VF (m)** cập nhật X, Y, Z ngay trong lúc kéo. Khi cần ẩn lớp chỉ dẫn, chọn **Tắt VF**. Trình duyệt ghi nhớ lựa chọn theo từng task.
+### Bật lớp chỉ dẫn VF
 
-![Minh họa kéo cuboid trong Top làm X và Y thay đổi, rồi kéo trong Side làm Z thay đổi. Yaw VF nằm cạnh mũi tên đỏ chỉ đầu cuboid.](docs/images/keo-cuboid-lidar-vf.gif)
+Mở một job 3D có dữ liệu theo hệ LiDAR VF. Trong khung **Perspective**, tìm bảng **Hệ trục LiDAR VF** và bấm **Bật VF**. Khi lớp chỉ dẫn hiện lên, nút chuyển thành **Tắt VF** như trong ảnh bên dưới. Mục **Bố trí 7 camera minh họa** cho biết hướng nhìn của các camera trên xe thu dữ liệu.
 
-Ảnh động dài 7,5 giây dùng dữ liệu giả lập. [Xem ảnh tĩnh để đối chiếu các nhãn](docs/images/tam-va-huong-cuboid.png).
+### Chọn cuboid và đọc hướng xe
 
-| Hệ trục | Cách đọc |
+Chọn cuboid của xe trong khung **Perspective**. Quan sát gốc trục trên xe gắn LiDAR và mũi tên đỏ trên cuboid.
+
+| Hệ trục | Vị trí và hướng |
 | --- | --- |
-| **LiDAR VF** | Trục cố định theo xe thu dữ liệu. **−Y** hướng về đầu xe, **+Y** về đuôi xe, **+X** sang trái, **−X** sang phải và **+Z** lên trên. Tọa độ tâm cuboid tính bằng mét từ gốc này. |
-| **Cuboid** | Trục gắn với hộp và xoay cùng hộp. **+X** chỉ đầu xe được gán nhãn, **−X** chỉ đuôi xe. |
+| **LiDAR VF** | Cố định tại gốc LiDAR của xe thu dữ liệu. **−Y** là đầu xe, **+Y** là đuôi, **+X** sang trái, **−X** sang phải và **+Z** lên trên. |
+| **Cuboid** | Xoay cùng hộp. Với lớp **Car**, **Truck** hoặc **Bus**, mũi tên đỏ **Cuboid +X · ĐẦU XE** chỉ đầu xe được gán nhãn. **Cuboid −X · ĐUÔI XE** nằm ở phía đối diện. |
 
-**Yaw VF** lấy **+X của LiDAR VF** làm 0°. Trong ảnh, cuboid hướng theo **−Y của LiDAR VF** nên yaw bằng **270°**. Nếu cần xem thêm mũi tên trục gốc của CVAT, bật **Appearance → Cuboid orientation**.
+![Ảnh minh họa bảng Hệ trục LiDAR VF đang bật, các trục cố định tại xe thu dữ liệu, nhãn đầu và đuôi cuboid, và Yaw VF 270° cạnh mũi tên đỏ.](docs/images/tam-va-huong-cuboid.png)
+
+Đọc **Yaw VF** cạnh mũi tên đỏ. Góc lấy **+X của LiDAR VF** làm 0°. Trong ảnh minh họa, mũi tên đầu cuboid chỉ theo **−Y của LiDAR VF**, tương ứng **270°**. Để đổi hướng, kéo điểm xoay của cuboid trong khung **Top** và đọc lại góc.
+
+Để hiện mũi tên định hướng gốc của CVAT, bật **Appearance → Cuboid orientation**.
+
+### Kéo cuboid và theo dõi tọa độ tâm
+
+1. Trong khung **Top**, giữ chuột trái bên trong cuboid và kéo để dịch ngang. Quan sát **X** và **Y** trong bảng **Tâm cuboid · LiDAR VF (m)**.
+2. Trong khung **Side**, kéo cuboid theo chiều dọc để chỉnh độ cao. Quan sát **Z** trong cùng bảng.
+3. Đọc các giá trị ngay khi đang giữ chuột. Chúng là tọa độ tâm tính bằng mét từ gốc LiDAR VF.
+
+![Ảnh động minh họa X và Y thay đổi khi kéo trong Top, sau đó Z thay đổi khi kéo trong Side.](docs/images/keo-cuboid-lidar-vf.gif)
+
+Ảnh tĩnh và GIF 7,5 giây dùng dữ liệu giả lập. Để ẩn lớp chỉ dẫn, bấm **Tắt VF**. Trình duyệt ghi nhớ lựa chọn theo từng task.
 
 ### Quay về giao diện gốc
 
@@ -57,27 +71,3 @@ docker compose -f docker-compose.yml up -d --no-deps --pull never cvat_ui
 ```
 
 Nếu image giao diện gốc đã được dọn khỏi máy, chạy `docker compose -f docker-compose.yml pull cvat_ui` trước khi tạo lại service.
-
-## Phát hành lên GitHub
-
-1. Tạo repo GitHub trống và đưa các file của bộ đóng gói vào gốc repo, gồm cả `.github/workflows/publish.yml`. Với repo mới, chạy các lệnh sau trong thư mục đã giải nén và thay URL ví dụ bằng URL của repo.
-
-   ```sh
-   git init -b main
-   git add .
-   git commit -m "Package CVAT VF overlay"
-   git remote add origin https://github.com/your-org/cvat-vf-overlay.git
-   git push -u origin main
-   ```
-
-2. Đẩy tag phiên bản để bắt đầu build.
-
-   ```sh
-   git tag v2.83.1-vf.1
-   git push origin v2.83.1-vf.1
-   ```
-
-3. Workflow **Publish CVAT VF UI** kiểm tra bản vá, build và đẩy một tag image chứa cả `linux/amd64` và `linux/arm64`. Tên image là `ghcr.io/<chủ-sở-hữu>/<repo>:<tag>`, với tên chủ sở hữu và repo ở dạng chữ thường. Workflow dùng quyền `packages: write` của `GITHUB_TOKEN`.
-4. Sau lần đẩy đầu tiên, mở package tương ứng trong GitHub **Packages**, vào **Package settings** và đặt **Public** để người dùng có thể tải image công khai. [Hướng dẫn GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
-
-Bản vá, file Compose và hướng dẫn nằm trong repo. Image cài đặt nằm trong GitHub Container Registry.
