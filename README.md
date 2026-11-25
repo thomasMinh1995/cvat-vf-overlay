@@ -9,12 +9,12 @@ Cần một hệ thống CVAT Community đang chạy bằng Docker Compose. Imag
 - Trên **Windows x64**, bật WSL 2 và chạy Docker Desktop ở chế độ Linux containers. Có thể chạy lệnh bằng PowerShell hoặc dùng khối Terminal nếu đang quản lý CVAT từ WSL. [Docker Desktop cho Windows](https://docs.docker.com/desktop/setup/install/windows-install/)
 - Trên **Mac**, dùng Docker Desktop đúng loại chip. Theo mặc định, Docker chọn `linux/arm64` trên Apple Silicon và `linux/amd64` trên Intel. Yêu cầu kiến trúc của backend tùy bản CVAT đang chạy. [Docker Desktop cho Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
 
-Đặt thư mục `cvat-vf-overlay` bên cạnh thư mục Compose của CVAT. Chạy lệnh **trong thư mục CVAT**, nơi có `docker-compose.yml`. Thay địa chỉ image ví dụ bằng địa chỉ GHCR xuất hiện trong phần **Summary** của workflow hoặc trong GitHub **Packages**.
+Đặt thư mục `cvat-vf-overlay` bên cạnh thư mục Compose của CVAT. Chạy lệnh **trong thư mục CVAT**, nơi có `docker-compose.yml`. Các lệnh bên dưới dùng image công khai `v2.83.1-vf.2` từ GHCR.
 
 ### Windows PowerShell
 
 ```powershell
-$env:CVAT_VF_IMAGE = 'ghcr.io/your-org/cvat-vf-overlay:v2.83.1-vf.1'
+$env:CVAT_VF_IMAGE = 'ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.2'
 docker compose -f docker-compose.yml -f ..\cvat-vf-overlay\docker-compose.vf-ego.yml config --quiet
 docker compose -f docker-compose.yml -f ..\cvat-vf-overlay\docker-compose.vf-ego.yml pull cvat_ui
 docker compose -f docker-compose.yml -f ..\cvat-vf-overlay\docker-compose.vf-ego.yml up -d --no-deps --pull never cvat_ui
@@ -23,7 +23,7 @@ docker compose -f docker-compose.yml -f ..\cvat-vf-overlay\docker-compose.vf-ego
 ### macOS Terminal hoặc WSL
 
 ```sh
-export CVAT_VF_IMAGE=ghcr.io/your-org/cvat-vf-overlay:v2.83.1-vf.1
+export CVAT_VF_IMAGE=ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.2
 docker compose -f docker-compose.yml -f ../cvat-vf-overlay/docker-compose.vf-ego.yml config --quiet
 docker compose -f docker-compose.yml -f ../cvat-vf-overlay/docker-compose.vf-ego.yml pull cvat_ui
 docker compose -f docker-compose.yml -f ../cvat-vf-overlay/docker-compose.vf-ego.yml up -d --no-deps --pull never cvat_ui
@@ -31,11 +31,24 @@ docker compose -f docker-compose.yml -f ../cvat-vf-overlay/docker-compose.vf-ego
 
 Nếu đang dùng file Compose bổ sung hoặc có `-p` riêng, giữ các tham số đó và thêm `-f docker-compose.vf-ego.yml` của overlay cuối danh sách file. File [cho máy cấu hình thấp](docker-compose.lowspec.yml) là tùy chọn khi dựng stack, dùng một tiến trình cho mỗi worker import/export và đưa Grafana vào profile `analytics`.
 
-### Bật lớp VF và quay về giao diện gốc
+## Sử dụng trong CVAT 3D
 
-1. Mở CVAT, thường ở [localhost:8080](http://localhost:8080), và vào task 3D dùng hệ trục LiDAR VF.
-2. Trong khung **Perspective**, chọn **Bật VF**. Trình duyệt ghi nhớ tùy chọn cho từng task. Task mới mặc định tắt.
-3. Chọn một cuboid để xem tọa độ tâm tính bằng mét theo gốc LiDAR. Với cuboid lớp Car, Truck hoặc Bus, mũi tên đỏ **+X** hướng về đầu xe được gán nhãn, mặt **−X** là đuôi xe và số **Yaw VF** nằm cạnh mũi tên đỏ.
+1. Mở một job 3D có dữ liệu theo hệ LiDAR VF. Trong khung **Perspective**, chọn **Bật VF** ở bảng **Hệ trục LiDAR VF**. Mở **Bố trí 7 camera minh họa** nếu cần xem hướng các camera.
+2. Chọn một cuboid. Với lớp **Car**, **Truck** hoặc **Bus**, mũi tên đỏ có nhãn **Cuboid +X · ĐẦU XE**. Nhãn **Cuboid −X · ĐUÔI XE** nằm ở phía đối diện. Đọc **Yaw VF** ngay cạnh mũi tên đỏ khi xoay hộp.
+3. Giữ chuột trái và kéo bên trong cuboid ở khung **Top** để dịch ngang hoặc kéo lên xuống ở khung **Side** để chỉnh độ cao. Bảng **Tâm cuboid · LiDAR VF (m)** cập nhật X, Y, Z ngay trong lúc kéo. Khi cần ẩn lớp chỉ dẫn, chọn **Tắt VF**. Trình duyệt ghi nhớ lựa chọn theo từng task.
+
+![Minh họa kéo cuboid trong Top làm X và Y thay đổi, rồi kéo trong Side làm Z thay đổi. Yaw VF nằm cạnh mũi tên đỏ chỉ đầu cuboid.](docs/images/keo-cuboid-lidar-vf.gif)
+
+Ảnh động dài 7,5 giây dùng dữ liệu giả lập. [Xem ảnh tĩnh để đối chiếu các nhãn](docs/images/tam-va-huong-cuboid.png).
+
+| Hệ trục | Cách đọc |
+| --- | --- |
+| **LiDAR VF** | Trục cố định theo xe thu dữ liệu. **−Y** hướng về đầu xe, **+Y** về đuôi xe, **+X** sang trái, **−X** sang phải và **+Z** lên trên. Tọa độ tâm cuboid tính bằng mét từ gốc này. |
+| **Cuboid** | Trục gắn với hộp và xoay cùng hộp. **+X** chỉ đầu xe được gán nhãn, **−X** chỉ đuôi xe. |
+
+**Yaw VF** lấy **+X của LiDAR VF** làm 0°. Trong ảnh, cuboid hướng theo **−Y của LiDAR VF** nên yaw bằng **270°**. Nếu cần xem thêm mũi tên trục gốc của CVAT, bật **Appearance → Cuboid orientation**.
+
+### Quay về giao diện gốc
 
 Để quay về giao diện gốc, tạo lại `cvat_ui` bằng các file Compose cũ của dự án.
 
