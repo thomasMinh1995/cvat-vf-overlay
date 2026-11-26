@@ -7,6 +7,10 @@ Lớp chỉ dẫn hiển thị hệ trục LiDAR VF, đầu và đuôi cuboid c�
 - **Điều chỉnh point cloud trong job 3D.** Hai thanh **Kích thước điểm** và **Độ sáng** cập nhật cả bốn góc nhìn. Trình duyệt ghi nhớ mức chỉnh.
 - **Tự cập nhật qua kênh `stable`.** Chạy script một lần trên Windows hoặc macOS để lên lịch cập nhật giao diện CVAT.
 
+![Kéo hai thanh Kích thước điểm và Độ sáng để xem point cloud thay đổi trong CVAT vf.4](docs/images/chinh-point-cloud-vf4.gif)
+
+GIF quay trên CVAT vf.4 bằng dữ liệu giả lập. Khung Front được phóng to để dễ thấy thay đổi kích thước điểm.
+
 ## Cài vào CVAT local
 
 Cần một hệ thống CVAT Community đang chạy bằng Docker Compose. Image giao diện được build từ mã CVAT UI **2.83.1**. Dùng cùng revision CVAT để khớp giao diện với backend. [Commit CVAT được ghim](https://github.com/cvat-ai/cvat/commit/271806df2ec87462dbb9fcdb76323a83182c8ba0) · [Hướng dẫn cài CVAT Community](https://docs.cvat.ai/docs/administration/community/basics/installation/)
