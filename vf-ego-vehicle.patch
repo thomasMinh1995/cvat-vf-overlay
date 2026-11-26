@@ -34,11 +34,15 @@ index 28a9b0a..4c49a01 100644
          this.view.keyControls(keys);
      }
 diff --git a/cvat-canvas3d/src/typescript/canvas3dModel.ts b/cvat-canvas3d/src/typescript/canvas3dModel.ts
-index bd56e79..12cc783 100644
+index bd56e79..a0fc482 100644
 --- a/cvat-canvas3d/src/typescript/canvas3dModel.ts
 +++ b/cvat-canvas3d/src/typescript/canvas3dModel.ts
-@@ -81,6 +81,8 @@ export interface Configuration {
+@@ -79,8 +79,12 @@ export interface Configuration {
+     outlinedBorders: string | false;
+     selectedShapeOpacity: number;
      controlPointsSize: number;
++    pointCloudSize: number;
++    pointCloudBrightness: number;
      focusedObjectPadding: number;
      orientationVisibility: OrientationVisibility;
 +    showVfEgoVehicle: boolean;
@@ -46,16 +50,18 @@ index bd56e79..12cc783 100644
  }
  
  export enum UpdateReasons {
-@@ -200,6 +202,8 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
+@@ -200,6 +204,10 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
                  selectedShapeOpacity: 60,
                  focusedObjectPadding: 50,
                  controlPointsSize: consts.BASE_POINT_SIZE,
++                pointCloudSize: 100,
++                pointCloudBrightness: 100,
 +                showVfEgoVehicle: false,
 +                showVfCameras: true,
                  orientationVisibility: {
                      x: false,
                      y: false,
-@@ -402,6 +406,11 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
+@@ -402,6 +410,11 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
      }
  
      public configure(configuration: Partial<Configuration>): void {
@@ -67,8 +73,23 @@ index bd56e79..12cc783 100644
          if (typeof configuration.shapeOpacity === 'number') {
              this.data.configuration.shapeOpacity = Math.max(0, Math.min(configuration.shapeOpacity, 100));
          }
+@@ -424,6 +437,14 @@ export class Canvas3dModelImpl extends MasterImpl implements Canvas3dModel {
+             this.data.configuration.controlPointsSize = configuration.controlPointsSize;
+         }
+ 
++        const { pointCloudSize, pointCloudBrightness } = configuration;
++        if (typeof pointCloudSize === 'number' && Number.isFinite(pointCloudSize)) {
++            this.data.configuration.pointCloudSize = Math.max(50, Math.min(400, pointCloudSize));
++        }
++        if (typeof pointCloudBrightness === 'number' && Number.isFinite(pointCloudBrightness)) {
++            this.data.configuration.pointCloudBrightness = Math.max(50, Math.min(400, pointCloudBrightness));
++        }
++
+         if (typeof configuration.orientationVisibility === 'object') {
+             const current = this.data.configuration.orientationVisibility;
+             current.x = !!(configuration.orientationVisibility?.x ?? current.x);
 diff --git a/cvat-canvas3d/src/typescript/canvas3dView.ts b/cvat-canvas3d/src/typescript/canvas3dView.ts
-index b17c197..9054bb2 100644
+index b17c197..17dd902 100644
 --- a/cvat-canvas3d/src/typescript/canvas3dView.ts
 +++ b/cvat-canvas3d/src/typescript/canvas3dView.ts
 @@ -18,10 +18,21 @@ import {
@@ -163,15 +184,16 @@ index b17c197..9054bb2 100644
              for (const view of BOTTOM_VIEWS) {
                  cuboid[view].visible = true;
                  createCuboidEdges(cuboid[view]);
-@@ -1503,6 +1521,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1503,6 +1521,8 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
              }
          } else if (reason === UpdateReasons.CONFIG_UPDATED) {
              const config = { ...model.data.configuration };
++            this.updatePointCloudAppearance();
 +            this.updateVfEgoVehicle();
              for (const key of Object.keys(this.drawnObjects)) {
                  const clientID = +key;
                  const { cuboid, data } = this.drawnObjects[clientID];
-@@ -1516,7 +1535,9 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1516,7 +1536,9 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
                      cuboid.setOutlineColor(config.outlinedBorders || consts.DEFAULT_OUTLINE_COLOR);
                  }
  
@@ -182,7 +204,7 @@ index b17c197..9054bb2 100644
              }
  
              BOTTOM_VIEWS.forEach((view) => {
-@@ -1648,6 +1669,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1648,6 +1670,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
      }
  
      private clearScene(): void {
@@ -190,7 +212,7 @@ index b17c197..9054bb2 100644
          Object.entries(this.drawnObjects).forEach(([clientID, { cuboid }]) => {
              this.removeSceneChildren(cuboid, +clientID);
          });
-@@ -1756,6 +1778,59 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1756,6 +1779,71 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
          return helperWorldSize;
      }
  
@@ -247,10 +269,33 @@ index b17c197..9054bb2 100644
 +        z.cone.getWorldPosition(labels.group.children[2].position);
 +    }
 +
++    private updatePointCloudAppearance(): void {
++        const { pointCloudSize, pointCloudBrightness } = this.model.data.configuration;
++        for (const view of ALL_VIEWS) {
++            const cloud = this.views[view].scene.children[0];
++            if (cloud instanceof THREE.Points && cloud.material instanceof THREE.PointsMaterial) {
++                const baseSize = view === ViewType.PERSPECTIVE ? 0.05 : 0.5;
++                cloud.material.size = baseSize * pointCloudSize / 100;
++                cloud.material.color.setScalar(pointCloudBrightness / 100);
++            }
++        }
++    }
++
      private onSceneImageLoaded(points: any): void {
          const getCameraSettingsToFitScene = (
              camera: THREE.PerspectiveCamera,
-@@ -1818,7 +1893,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1795,10 +1883,6 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+             };
+         };
+ 
+-        // eslint-disable-next-line no-param-reassign
+-        points.material.size = 0.05;
+-        points.material.color.set(new THREE.Color(0xffffff));
+-
+         const { controls } = this.views.perspective;
+         controls.mouseButtons.wheel = CameraControls.ACTION.DOLLY;
+ 
+@@ -1818,7 +1902,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
  
          const origin = new THREE.Vector3(0, 0, 0);
          const isOriginInScene = this.sceneBBox.containsPoint(origin);
@@ -259,7 +304,7 @@ index b17c197..9054bb2 100644
          if (isOriginInScene) {
              this.cameraSettings.perspective.lookAt = [0, 0, 0];
              axesHelper.position.set(0, 0, 0);
-@@ -1828,6 +1903,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1828,6 +1912,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
          }
  
          this.views.perspective.scene.add(axesHelper);
@@ -267,7 +312,24 @@ index b17c197..9054bb2 100644
          // Setup TopView
          const canvasTopView = this.views.top.renderer.domElement;
          const topScenePlane = new THREE.Mesh(
-@@ -2016,6 +2092,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -1848,7 +1933,6 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+         (topScenePlane as any).verticesNeedUpdate = true;
+         // eslint-disable-next-line no-param-reassign
+         points.material = material;
+-        material.size = 0.5;
+         const topCloud = points.clone();
+         this.views.top.scene.add(topCloud);
+         this.views.top.scene.add(topScenePlane);
+@@ -1898,6 +1982,8 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+         this.views.front.scene.add(frontCloud);
+         this.views.front.scene.add(frontScenePlane);
+ 
++        this.updatePointCloudAppearance();
++
+         if (this.mode === Mode.DRAW) {
+             this.views[ViewType.PERSPECTIVE].scene.children[0].add(this.cube.perspective);
+         }
+@@ -2016,6 +2102,7 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
      };
  
      public render(): void {
@@ -275,7 +337,7 @@ index b17c197..9054bb2 100644
          Object.keys(this.views).forEach((view: string): void => {
              const viewType = this.views[view as keyof Views];
              if (!(viewType.controls && viewType.camera && viewType.rayCaster)) return;
-@@ -2552,6 +2629,10 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
+@@ -2552,6 +2639,10 @@ export class Canvas3dViewImpl implements Canvas3dView, Listener {
          }
      }
  
@@ -537,6 +599,106 @@ index 0000000..248c152
 +
 +    return group;
 +}
+diff --git a/cvat-ui/src/components/annotation-page/appearance-block.tsx b/cvat-ui/src/components/annotation-page/appearance-block.tsx
+index d170bef..5264455 100644
+--- a/cvat-ui/src/components/annotation-page/appearance-block.tsx
++++ b/cvat-ui/src/components/annotation-page/appearance-block.tsx
+@@ -3,9 +3,9 @@
+ //
+ // SPDX-License-Identifier: MIT
+ 
+-import React, { Dispatch } from 'react';
++import React, { Dispatch, useEffect, useState } from 'react';
+ import { AnyAction } from 'redux';
+-import { connect } from 'react-redux';
++import { connect, useSelector } from 'react-redux';
+ import Text from 'antd/lib/typography/Text';
+ import Radio, { RadioChangeEvent } from 'antd/lib/radio';
+ import Slider from 'antd/lib/slider';
+@@ -17,7 +17,7 @@ import ColorPicker from 'components/annotation-page/standard-workspace/objects-s
+ import { ColorizeIcon } from 'icons';
+ import { ColorBy, CombinedState, Workspace } from 'reducers';
+ import { DimensionType, Job } from 'cvat-core-wrapper';
+-import { OrientationVisibility } from 'cvat-canvas3d-wrapper';
++import { Canvas3d, OrientationVisibility } from 'cvat-canvas3d-wrapper';
+ import { collapseAppearance as collapseAppearanceAction } from 'actions/annotation-actions';
+ import {
+     changeShapesColorBy as changeShapesColorByAction,
+@@ -139,6 +139,62 @@ function mapDispatchToProps(dispatch: Dispatch<AnyAction>): DispatchToProps {
+ 
+ type Props = StateToProps & DispatchToProps;
+ 
++const POINT_CLOUD_STORAGE = 'cvat.point-cloud-appearance';
++const pointCloudDefault = { pointCloudSize: 100, pointCloudBrightness: 100 };
++
++function readPointCloudAppearance(): typeof pointCloudDefault {
++    try {
++        const saved = JSON.parse(window.localStorage.getItem(POINT_CLOUD_STORAGE) || '{}');
++        const normalize = (value: unknown): number => (
++            typeof value === 'number' && Number.isFinite(value) ? Math.max(50, Math.min(400, value)) : 100
++        );
++        return {
++            pointCloudSize: normalize(saved?.pointCloudSize),
++            pointCloudBrightness: normalize(saved?.pointCloudBrightness),
++        };
++    } catch {
++        return pointCloudDefault;
++    }
++}
++
++function PointCloudAppearance(): JSX.Element {
++    const canvas = useSelector((state: CombinedState) => state.annotation.canvas.instance as Canvas3d);
++    const [settings, setSettings] = useState(readPointCloudAppearance);
++
++    useEffect(() => {
++        canvas?.configure(settings);
++        try {
++            window.localStorage.setItem(POINT_CLOUD_STORAGE, JSON.stringify(settings));
++        } catch {
++            // Allow live adjustment when browser storage is unavailable.
++        }
++    }, [canvas, settings]);
++
++    return (
++        <section aria-label='Point cloud'>
++            <Text strong>Point cloud</Text>
++            <div><Text type='secondary'>Kích thước điểm · {settings.pointCloudSize}%</Text></div>
++            <Slider
++                ariaLabelForHandle='Kích thước điểm'
++                value={settings.pointCloudSize}
++                min={50}
++                max={400}
++                step={25}
++                onChange={(value) => setSettings((current) => ({ ...current, pointCloudSize: value }))}
++            />
++            <div><Text type='secondary'>Độ sáng · {settings.pointCloudBrightness}%</Text></div>
++            <Slider
++                ariaLabelForHandle='Độ sáng'
++                value={settings.pointCloudBrightness}
++                min={50}
++                max={400}
++                step={25}
++                onChange={(value) => setSettings((current) => ({ ...current, pointCloudBrightness: value }))}
++            />
++        </section>
++    );
++}
++
+ function AppearanceBlock(props: Props): JSX.Element {
+     const {
+         appearanceCollapsed,
+@@ -195,9 +251,11 @@ function AppearanceBlock(props: Props): JSX.Element {
+                     </Text>
+                 ),
+                 key: 'appearance',
++                forceRender: is3D,
+                 children: (
+                     <div className='cvat-objects-appearance-content cvat-appearance-block'>
+                         <GlobalHotKeys keyMap={subKeyMap(componentShortcuts, keyMap)} handlers={handlers} />
++                        {is3D && <PointCloudAppearance />}
+                         <Text type='secondary'>Color by</Text>
+                         <Radio.Group
+                             className='cvat-appearance-color-by-radio-group'
 diff --git a/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/canvas-wrapper3D.tsx b/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/canvas-wrapper3D.tsx
 index ad14fd4..b6cddd1 100644
 --- a/cvat-ui/src/components/annotation-page/canvas/views/canvas3d/canvas-wrapper3D.tsx
