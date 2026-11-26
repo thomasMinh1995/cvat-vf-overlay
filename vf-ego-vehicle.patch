@@ -624,7 +624,7 @@ index d170bef..5264455 100644
  import { collapseAppearance as collapseAppearanceAction } from 'actions/annotation-actions';
  import {
      changeShapesColorBy as changeShapesColorByAction,
-@@ -139,6 +139,62 @@ function mapDispatchToProps(dispatch: Dispatch<AnyAction>): DispatchToProps {
+@@ -139,6 +139,73 @@ function mapDispatchToProps(dispatch: Dispatch<AnyAction>): DispatchToProps {
  
  type Props = StateToProps & DispatchToProps;
  
@@ -661,7 +661,18 @@ index d170bef..5264455 100644
 +
 +    return (
 +        <section aria-label='Point cloud'>
-+            <Text strong>Point cloud</Text>
++            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
++                <Text strong>Point cloud</Text>
++                <Button
++                    type='link'
++                    size='small'
++                    disabled={settings.pointCloudSize === pointCloudDefault.pointCloudSize &&
++                        settings.pointCloudBrightness === pointCloudDefault.pointCloudBrightness}
++                    onClick={() => setSettings(pointCloudDefault)}
++                >
++                    Về mặc định
++                </Button>
++            </div>
 +            <div><Text type='secondary'>Kích thước điểm · {settings.pointCloudSize}%</Text></div>
 +            <Slider
 +                ariaLabelForHandle='Kích thước điểm'
@@ -687,7 +698,7 @@ index d170bef..5264455 100644
  function AppearanceBlock(props: Props): JSX.Element {
      const {
          appearanceCollapsed,
-@@ -195,9 +251,11 @@ function AppearanceBlock(props: Props): JSX.Element {
+@@ -195,9 +262,11 @@ function AppearanceBlock(props: Props): JSX.Element {
                      </Text>
                  ),
                  key: 'appearance',

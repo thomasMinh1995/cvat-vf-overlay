@@ -2,6 +2,10 @@
 
 Lớp chỉ dẫn hiển thị hệ trục LiDAR VF, đầu và đuôi cuboid của xe, góc **Yaw VF** và tọa độ tâm **X, Y, Z** cập nhật khi kéo hộp. Thân xe và bảy camera dùng bố trí minh họa.
 
+## Điểm mới trong `vf.5`
+
+Nút **Về mặc định** trong **Appearance → Point cloud** đưa cả **Kích thước điểm** và **Độ sáng** về **100%** ngay trên cả bốn góc nhìn.
+
 ## Điểm mới trong `vf.4`
 
 - **Điều chỉnh point cloud trong job 3D.** Hai thanh **Kích thước điểm** và **Độ sáng** cập nhật cả bốn góc nhìn. Trình duyệt ghi nhớ mức chỉnh.
@@ -18,12 +22,12 @@ Cần một hệ thống CVAT Community đang chạy bằng Docker Compose. Imag
 - Trên **Windows x64**, bật WSL 2 và chạy Docker Desktop ở chế độ Linux containers. Có thể chạy lệnh bằng PowerShell hoặc dùng khối Terminal nếu đang quản lý CVAT từ WSL. [Docker Desktop cho Windows](https://docs.docker.com/desktop/setup/install/windows-install/)
 - Trên **Mac**, dùng Docker Desktop đúng loại chip. Theo mặc định, Docker chọn `linux/arm64` trên Apple Silicon và `linux/amd64` trên Intel. Yêu cầu kiến trúc của backend tùy bản CVAT đang chạy. [Docker Desktop cho Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
 
-Đặt thư mục `cvat-vf-overlay` bên cạnh thư mục Compose của CVAT. Chạy lệnh **trong thư mục CVAT**, nơi có `docker-compose.yml`. Các lệnh bên dưới dùng image công khai `v2.83.1-vf.4` từ GHCR.
+Đặt thư mục `cvat-vf-overlay` bên cạnh thư mục Compose của CVAT. Chạy lệnh **trong thư mục CVAT**, nơi có `docker-compose.yml`. Các lệnh bên dưới dùng image công khai `v2.83.1-vf.5` từ GHCR.
 
 ### Windows PowerShell
 
 ```powershell
-$env:CVAT_VF_IMAGE = 'ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.4'
+$env:CVAT_VF_IMAGE = 'ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.5'
 docker compose -f docker-compose.yml -f ..\cvat-vf-overlay\docker-compose.vf-ego.yml config --quiet
 docker compose -f docker-compose.yml -f ..\cvat-vf-overlay\docker-compose.vf-ego.yml pull cvat_ui
 docker compose -f docker-compose.yml -f ..\cvat-vf-overlay\docker-compose.vf-ego.yml up -d --no-deps --pull never cvat_ui
@@ -32,7 +36,7 @@ docker compose -f docker-compose.yml -f ..\cvat-vf-overlay\docker-compose.vf-ego
 ### macOS Terminal hoặc WSL
 
 ```sh
-export CVAT_VF_IMAGE=ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.4
+export CVAT_VF_IMAGE=ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.5
 docker compose -f docker-compose.yml -f ../cvat-vf-overlay/docker-compose.vf-ego.yml config --quiet
 docker compose -f docker-compose.yml -f ../cvat-vf-overlay/docker-compose.vf-ego.yml pull cvat_ui
 docker compose -f docker-compose.yml -f ../cvat-vf-overlay/docker-compose.vf-ego.yml up -d --no-deps --pull never cvat_ui
@@ -58,7 +62,7 @@ Repo này cung cấp bản vá và file Compose bổ sung. File đó trỏ dịc
    Kết quả mong đợi với bản trong hướng dẫn này.
 
    ```text
-   ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.4 running
+   ghcr.io/thomasminh1995/cvat-vf-overlay:v2.83.1-vf.5 running
    ```
 
 3. Tải lại trang CVAT và mở một job 3D dùng hệ LiDAR VF. Trong khung **Perspective**, tìm bảng **Hệ trục LiDAR VF**. Bấm **Bật VF** để thấy trục và tùy chọn **Hiện 7 camera**. Chọn cuboid để kiểm tra **Yaw VF** và bảng tọa độ tâm như trong ảnh minh họa bên dưới.
@@ -82,7 +86,7 @@ Xem nhật ký tại `%LOCALAPPDATA%\CVAT VF Auto Update\update.log` trên Windo
 
 ### Chỉnh độ rõ point cloud
 
-Mở **Appearance → Point cloud** trong job 3D. **Kích thước điểm** và **Độ sáng** chạy từ **50% đến 400%** với mặc định **100%**. Bốn góc nhìn cập nhật khi kéo. Trình duyệt ghi nhớ mức chỉnh.
+Mở **Appearance → Point cloud** trong job 3D. **Kích thước điểm** và **Độ sáng** chạy từ **50% đến 400%**. Bốn góc nhìn cập nhật khi kéo. Bấm **Về mặc định** để đưa cả hai về **100%**. Trình duyệt ghi nhớ mức đã chọn.
 
 ### Bật lớp chỉ dẫn VF
 
